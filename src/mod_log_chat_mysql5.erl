@@ -71,6 +71,9 @@ init([_Host, Opts]) ->
 	Password = gen_mod:get_opt(password, Opts, ""),
 	PoolSize = gen_mod:get_opt(pool_size, Opts, 1),
 	Encoding = gen_mod:get_opt(encoding, Opts, utf8),
+	IgnoreFrom = gen_mod:get_opt(ignore_from, Opts, []),
+	ets:new(mod_log_chat_mysql5, [named_table, protected]),
+	ets:insert(mod_log_chat_mysql5, {ignorefrom, IgnoreFrom}),
 
 	?INFO_MSG("Opening mysql connection ~s@~s:~p/~s", [User, Server, Port, DB]),
 	emysql:add_pool(mod_log_chat_mysql5_db, PoolSize, User, Password, Server, Port, DB, Encoding),
@@ -138,7 +141,16 @@ log_packet(From, To, Packet = {xmlelement, "message", Attrs, _Els}) ->
 			?DEBUG("dropping error: ~s", [xml:element_to_string(Packet)]),
 			ok;
 		_ ->
-			write_packet(From, To, Packet, xml:get_attr_s("type", Attrs))
+			BJID = jlib:jid_to_string(jlib:jid_remove_resource(From)),
+			[{_, IgnoreFrom}] = ets:lookup(mod_log_chat_mysql5, ignorefrom),
+			IsMember = lists:member(BJID, IgnoreFrom),
+			if
+				IsMember ->
+					?DEBUG("dropping notification from '~s': ~s", [BJID, xml:element_to_string(Packet)]),
+					ok;
+				true ->
+					write_packet(From, To, Packet, xml:get_attr_s("type", Attrs))
+			end
 	end;
 log_packet(_From, _To, _Packet) ->
 	ok.
