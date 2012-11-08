@@ -163,15 +163,8 @@ write_packet(From, To, Packet, Type) ->
 			?DEBUG("not logging empty message from ~s",[jlib:jid_to_string(From)]),
 			ok;
 		_ ->
-			FromJid = From#jid.luser++"@"++From#jid.lserver++"/"++From#jid.resource,
-			ResourceLen = length(To#jid.resource),
-			%% don't include resource when target is muc room
-			if
-				ResourceLen > 0 ->
-					ToJid = To#jid.luser++"@"++To#jid.lserver++"/"++To#jid.resource;
-				true ->
-					ToJid = To#jid.luser++"@"++To#jid.lserver
-			end,
+			FromJid = From#jid.luser,
+			ToJid = To#jid.luser,
 			Proc = gen_mod:get_module_proc(From#jid.server, ?PROCNAME),
 			gen_server:cast(Proc, {insert_row, FromJid, ToJid, Body, Type})
 	end.
